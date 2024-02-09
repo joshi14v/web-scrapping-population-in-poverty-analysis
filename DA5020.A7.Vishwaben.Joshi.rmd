@@ -1,0 +1,137 @@
+---
+title: "Assignment 7"
+output: html_document
+date: '2022-06-28'
+---
+
+```{r}
+##install.packages("RCurl")
+##install.packages("XML")
+##install.packages("rvest")
+library(rvest)
+library(XML)
+library(RCurl)
+library(tidyverse)
+library(dplyr)
+
+```
+
+Loading the HTML file data in R environment
+```{r}
+#Load the data from HTML to r 
+data <- read_html("https://en.m.wikipedia.org/wiki/List_of_countries_by_percentage_of_population_living_in_poverty")
+class(data)
+
+html <- data %>% html_table(., fill = TRUE ,trim = TRUE)
+
+data1 <- html[[2]]
+
+```
+Q 1 - Scrape the data from the webpage and extract the following fields: Country, < $1.90,  < 
+$3.20, < $5.50, Year and Continent. Prepare the data for analysis and ensure that the columns have 
+meaningful names. 
+```{r}
+## counting NA rows 
+sum(is.na(data1))
+
+unique(data1$Continent)
+## no missing value available
+## renaming and mutating the columns to prepare for analysis
+data2 <- data1 %>%
+  rename(
+    lessthan_1.90 = "< $1.90[8][1]",
+    lessthan_3.20 = "< $3.20[6]",
+    lessthan_5.50 = "< $5.50[7]"
+    )
+
+
+## data ready for analysis
+
+data3 <- data2 %>% mutate('lessthan_1.90' = as.numeric(sub("%", "", data2$lessthan_1.90, fixed = TRUE)),
+                                        'lessthan_3.20' = as.numeric(sub("%", "", data2$lessthan_3.20, fixed = TRUE)),
+                                        'lessthan_5.50' = as.numeric(sub("%", "", data2$lessthan_5.50, fixed = TRUE)),
+                                        'Year' = as.numeric(data2$Year))
+
+```
+
+Q2 - Calculate the mean and the standard deviation of the percent of the population living under 
+$5.50 per day for each continent. Perform a comparative analysis (i.e. explanation) of the data from 
+each continent. 
+```{r}
+## create new data_frame with mean and standard deviation of the percent of the population living under $5.50 per day for each continent
+q2_data <- data3 %>% select(-lessthan_1.90, -lessthan_3.20, -Year, -Country) %>% 
+  group_by(Continent) %>% summarise(mean = mean(as.numeric(lessthan_5.50)), standard_deviation = sd(as.numeric(lessthan_5.50)))
+## visualizing the data with mean of the population living under $5.50/day by grouping continents
+ggplot(q2_data, aes(Continent, mean, fill = Continent)) + 
+  geom_bar(stat = "identity") + 
+  ggtitle("Mean of the percent of population living under $5.50/day for each continent") + 
+  labs(x = "Continent", y = "Mean values")
+## visualizing the data with standard deviation of the population living under $5.50/day by grouping continents
+ggplot(q2_data, aes(Continent, standard_deviation, fill = Continent)) + 
+  geom_bar(stat = "identity") + 
+  ggtitle("standard deviation of the percent of population living under $5.50/day for each continent") + 
+  labs(x = "Continent", y = "standard deviation")
+sum(is.na(q2_data))
+```
+
+Q3 - What are the 10 countries with the highest percentage of the population having an income 
+of  less  than  $5.50  per  day?  Using  a  suitable  chart,  display  the  country  name,  the  percentage  and  
+color- code by the Continent. Summarize your findings. 
+
+```{r}
+## Create q3_data with 10 countries with the highest percentage of the population having an income of less than $5.50 per day.
+q3_data <- data3 %>% select(Country,lessthan_5.50, Continent) %>% arrange(desc(lessthan_5.50))
+q3_data <- head(q3_data, n = 10)
+
+## visualize the data using bar chart
+ggplot(q3_data, aes(Country, lessthan_5.50, fill = Continent)) +
+  geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 90)) + 
+  ggtitle("Countries with population having an income less than $5.50/day") + 
+  labs(x = "Country", y = "Percentage") +
+  geom_text(aes(label = lessthan_5.50))
+##Most of the countries with the highest percentage of the population having an income less than 5.50/day are from Africa continent. The highest percentage is of Democratic Republic and Somalia. While Asia continent have only one country Uzbekistan having population with less than 5.50/day income
+```
+
+Q4 - Explore the countries with the lowest percentage of the population having an income of 
+less than $5.50 per day. What are the 5 countries with the lowest percentage, and how does the 
+results compare to the other income groups (i.e. $1.90 and $3.20)? 
+```{r}
+## Create q4_data with countries with the lowest percentage of the population having an income of less than $5.50 per day
+q4_data <- data3 %>% select(Country, lessthan_5.50, lessthan_1.90, lessthan_3.20) %>% group_by(Country) %>% arrange(lessthan_5.50)
+q4_data <- head(q4_data, n = 5) 
+## Belarus, Finland, France, Iceland and Ireland have lowest percentage of the population having an income of less than $5.50 per day
+## comparing this countries with less than 1.90$ or 3.20$ per day population is 0% for living less than $1.90/day while for living on 5.50 and 3.20$ per day is between 0 to 0.1% 
+ggplot(q4_data, aes(Country, lessthan_5.50)) + geom_bar(stat = "identity") 
+
+ggplot(q4_data, aes(Country, lessthan_3.20)) + geom_bar(stat = "identity") 
+
+ggplot(q4_data, aes(Country, lessthan_1.90)) + geom_bar(stat = "identity") 
+
+
+```
+
+Q5 - Extract the data for any two continents of your choice. Fore each continent, visualize the 
+percent of the population living on less than $1.90, $3.20 and $5.50 using box plots. Compare and 
+contrast the results, while ensuring that you discuss the distribution, skew and any outliers that are 
+evident. 
+```{r}
+## Create q5_data having 2 continents with percent of the population living on less than $1.90, $3.20 and $5.50 
+q5_data <- data3 %>% filter(Continent == "Asia" | Continent == "Africa") %>% group_by(Continent) %>% na.omit()
+##visualize using box plot 
+##1
+ggplot(q5_data, aes(lessthan_1.90, color = Continent)) + geom_boxplot(outlier.colour = "green") + labs(x = "Percentage") + ggtitle("Percent of the population living on less than $1.90")
+## Comparing 2 continent Asia and Africa, Asia's population living on less then $1.90 is between 5% while Africa's population shows between 15% to 40% with major population around 26% lowest point is 0 and highest point is 78%
+## some of the Outliers can be seen for Asia's population majorly between 10-25% 
+
+##2
+ggplot(q5_data, aes(lessthan_3.20, color = Continent)) + geom_boxplot(outlier.color = "blue") + labs(x = "Percentage") + ggtitle("Percent of the population living on less than $3.20")
+## Comparing 2 continent Asia and Africa on percent of the population living on less than $3.20, Asia's highest and lowest point at 0% to 35% majorly population distributed in 1 to 20% while comparing Africa population is high between 30 to 75% with highest point 1%. OUTLIERS DISTRIBUTION CAN BE SEEN FOR Asia's population
+
+##3
+ggplot(q5_data, aes(lessthan_5.50, color = Continent))+ geom_boxplot(outlier.color = "brown") + labs(x = "Percentage")+ ggtitle("Percent of the population living on less than $5.50")
+## Comparing 2 continent Asia and Africa on percent of the population living on less than $5.50, Asia's highest and lowest point at 0% to 10% majorly population distributed in 15 to 50% while comparing Africa population is high between 60 to 85% with highest point 1%. scatred data for africa can be seen between 0.10 to 20%
+
+## Analysing 3 data Africa's majority population is living on less than $3.20/day. While Asia's mostly population living on less than $5.50/day
+```
+
